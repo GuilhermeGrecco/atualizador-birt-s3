@@ -4,7 +4,6 @@ from flask_cors import CORS
 import boto3
 
 app = Flask(__name__)
-# O CORS permite que a sua página HTML converse com esta API
 CORS(app)
 
 # ================= Configurações =================
@@ -57,17 +56,25 @@ def receber_arquivos():
 
     for arquivo in arquivos:
         if arquivo and arquivo.filename.endswith('.rptdesign'):
-            for destino in destinos:
-                caminho_completo_s3 = f"{destino}{arquivo.filename}"
+            try:
+                # LER O ARQUIVO NA MEMÓRIA UMA ÚNICA VEZ
+                conteudo_arquivo = arquivo.read()
                 
-                try:
-                    # REBOBINA O ARQUIVO NA MEMÓRIA ANTES DE CADA UPLOAD
-                    arquivo.seek(0)
+                for destino in destinos:
+                    caminho_completo_s3 = f"{destino}{arquivo.filename}"
                     
-                    s3_client.upload_fileobj(arquivo, NOME_DO_BUCKET, caminho_completo_s3)
-                    resultados.append(f"✅ {arquivo.filename} -> {caminho_completo_s3}")
-                except Exception as e:
-                    resultados.append(f"❌ Erro em {arquivo.filename} -> {caminho_completo_s3}: {str(e)}")
+                    try:
+                        # Envia os dados armazenados na memória usando put_object
+                        s3_client.put_object(
+                            Bucket=NOME_DO_BUCKET,
+                            Key=caminho_completo_s3,
+                            Body=conteudo_arquivo
+                        )
+                        resultados.append(f"✅ {arquivo.filename} -> {caminho_completo_s3}")
+                    except Exception as e:
+                        resultados.append(f"❌ Erro em {arquivo.filename} -> {caminho_completo_s3}: {str(e)}")
+            except Exception as e:
+                resultados.append(f"❌ Erro ao ler o arquivo {arquivo.filename}: {str(e)}")
         else:
             resultados.append(f"⚠️ Ignorado (formato inválido): {arquivo.filename}")
 
