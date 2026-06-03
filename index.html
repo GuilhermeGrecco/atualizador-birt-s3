@@ -69,16 +69,30 @@
 
         let arquivosSelecionados = [];
 
-        dropZone.addEventListener('click', () => fileInput.click());
+        // Ao clicar na zona, abre a seleção de arquivos do Windows
+        dropZone.addEventListener('click', (e) => {
+            if (e.target !== fileInput) {
+                fileInput.click();
+            }
+        });
+
+        // Eventos de arrastar arquivos
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
         dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); adicionarArquivos(e.dataTransfer.files); });
-        fileInput.addEventListener('change', (e) => adicionarArquivos(e.target.files));
+        
+        // Evento de selecionar arquivos clicando (via Explorer)
+        fileInput.addEventListener('change', (e) => {
+            adicionarArquivos(e.target.files);
+        });
 
         function adicionarArquivos(files) {
             for (let i = 0; i < files.length; i++) {
                 if (files[i].name.endsWith('.rptdesign')) {
-                    arquivosSelecionados.push(files[i]);
+                    // Evita adicionar o mesmo arquivo duplicado na lista visual antes do envio
+                    if (!arquivosSelecionados.some(arq => arq.name === files[i].name)) {
+                        arquivosSelecionados.push(files[i]);
+                    }
                 } else {
                     alert(`O arquivo ${files[i].name} não é um formato suportado (.rptdesign)`);
                 }
@@ -101,9 +115,11 @@
             });
         }
 
-        
+        // --- Lógica de Validação do Botão ---
+        if (selectAmbiente) selectAmbiente.addEventListener('change', verificarEstadoBotao);
+        if (selectTipoArquivo) selectTipoArquivo.addEventListener('change', verificarEstadoBotao);
+
         function verificarEstadoBotao() {
-            // Só libera o botão se tiver arquivo, ambiente E tipo de arquivo selecionados
             if (arquivosSelecionados.length > 0 && selectAmbiente.value !== "" && selectTipoArquivo.value !== "") {
                 btnAtualizar.disabled = false;
             } else {
@@ -111,14 +127,11 @@
             }
         }
 
-        selectAmbiente.addEventListener('change', verificarEstadoBotao);
-        selectTipoArquivo.addEventListener('change', verificarEstadoBotao);
-
         // --- Envio para API ---
         btnAtualizar.addEventListener('click', async () => {
             const formData = new FormData();
             formData.append('ambiente', selectAmbiente.value);
-            formData.append('tipo_arquivo', selectTipoArquivo.value); // Envia a nova informação
+            formData.append('tipo_arquivo', selectTipoArquivo.value);
             
             arquivosSelecionados.forEach(file => formData.append('arquivos', file));
 
@@ -139,7 +152,10 @@
                     resultado.detalhes.forEach(det => mensagemFinal += det + "\n");
                     alert(mensagemFinal);
                     
+                    // --- LIMPEZA COMPLETA DE ESTADO ---
                     arquivosSelecionados = [];
+                    fileInput.value = ''; // <--- ESSA LINHA DIZ PARA O EXPLORER ESQUECER O ARQUIVO VELHO
+                    
                     atualizarListaVisual();
                     selectAmbiente.value = "";
                     selectTipoArquivo.value = "";
