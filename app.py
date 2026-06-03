@@ -10,14 +10,19 @@ CORS(app)
 # ================= Configurações =================
 NOME_DO_BUCKET = 'el-gpicloud-files'
 
-# Puxando os caminhos diretamente das variáveis de ambiente do Render
-CAMINHOS_S3 = {
+# Caminhos para Relatórios (Padrão)
+CAMINHOS_S3_RELATORIO = {
     'homologacao': os.getenv('S3_PATH_HOMOLOGACAO'),
     'producao': os.getenv('S3_PATH_PRODUCAO')
 }
+
+# Caminhos para Masterpages
+CAMINHOS_S3_MASTERPAGE = {
+    'homologacao': os.getenv('S3_PATH_MASTERPAGE_HOMOLOGACAO'),
+    'producao': os.getenv('S3_PATH_MASTERPAGE_PRODUCAO')
+}
 # =================================================
 
-# Inicializa o cliente da AWS usando as credenciais configuradas no Render
 s3_client = boto3.client(
     's3',
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
@@ -32,15 +37,24 @@ def receber_arquivos():
     
     arquivos = request.files.getlist('arquivos')
     ambiente = request.form.get('ambiente')
+    tipo_arquivo = request.form.get('tipo_arquivo') # Recebe o novo campo da tela
 
+    # Validações
     if not ambiente or ambiente not in ['homologacao', 'producao', 'ambos']:
         return jsonify({'erro': 'Ambiente inválido ou não informado.'}), 400
+        
+    if not tipo_arquivo or tipo_arquivo not in ['relatorio', 'masterpage']:
+        return jsonify({'erro': 'Tipo de arquivo inválido ou não informado.'}), 400
 
+    # Define qual dicionário de caminhos usar com base na seleção
+    caminhos_ativos = CAMINHOS_S3_RELATORIO if tipo_arquivo == 'relatorio' else CAMINHOS_S3_MASTERPAGE
+
+    # Define os destinos finais
     destinos = []
     if ambiente == 'ambos':
-        destinos = [CAMINHOS_S3['homologacao'], CAMINHOS_S3['producao']]
+        destinos = [caminhos_ativos['homologacao'], caminhos_ativos['producao']]
     else:
-        destinos = [CAMINHOS_S3[ambiente]]
+        destinos = [caminhos_ativos[ambiente]]
 
     resultados = []
 
