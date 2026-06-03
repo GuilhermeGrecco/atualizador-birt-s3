@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atualizador de Relatórios BIRT</title>
+    <style>
+        /* Estilos baseados no visual clean do 'Padronizador' */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 600px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+
+        /* Área de Drag and Drop */
+        .drop-zone {
+            border: 2px dashed #ced4da;
+            border-radius: 6px;
+            padding: 40px 20px;
+            text-align: center;
+            background-color: #fcfcfc;
+            cursor: pointer;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            background-color: #e9ecef;
+            border-color: #6c757d;
+        }
+
+        .drop-zone p {
+            margin: 0;
+            color: #6c757d;
+            font-size: 16px;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        /* Lista de Arquivos Selecionados */
+        #file-list {
+            margin-top: 15px;
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #file-list li {
+            background-color: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Select de Ambiente */
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 16px;
+            color: #495057;
+            background-color: #fff;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+        }
+
+        /* Botão de Envio */
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .btn-submit:hover {
+            background-color: #5a6268;
+        }
+
+        .btn-submit:disabled {
+            background-color: #c6cacc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Atualizador BIRT</h1>
+
+        <!-- Área de Upload de Arquivos -->
+        <div class="form-group">
+            <label>1. Selecione os Relatórios (.rptdesign)</label>
+            <div class="drop-zone" id="drop-zone">
+                <p>Arraste os arquivos aqui ou clique para selecionar</p>
+                <input type="file" id="file-input" multiple accept=".rptdesign">
+            </div>
+            <ul id="file-list"></ul>
+        </div>
+
+        <!-- Seleção de Ambiente -->
+        <div class="form-group">
+            <label for="ambiente">2. Atualizar no Ambiente:</label>
+            <select id="ambiente">
+                <option value="" disabled selected>Selecione um ambiente...</option>
+                <option value="homologacao">Somente Homologação (Pasta X)</option>
+                <option value="producao">Somente Produção (Pasta Y)</option>
+                <option value="ambos">Atualizar Ambos os Ambientes</option>
+            </select>
+        </div>
+
+        <!-- Botão de Ação -->
+        <button class="btn-submit" id="btn-atualizar" disabled>Atualizar Arquivos</button>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileList = document.getElementById('file-list');
+        const selectAmbiente = document.getElementById('ambiente');
+        const btnAtualizar = document.getElementById('btn-atualizar');
+
+        let arquivosSelecionados = [];
+
+        // --- Lógica de Drag and Drop ---
+        
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            adicionarArquivos(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            adicionarArquivos(e.target.files);
+        });
+
+        function adicionarArquivos(files) {
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].name.endsWith('.rptdesign')) {
+                    arquivosSelecionados.push(files[i]);
+                } else {
+                    alert(`O arquivo ${files[i].name} não é um formato suportado (.rptdesign)`);
+                }
+            }
+            atualizarListaVisual();
+            verificarEstadoBotao();
+        }
+
+        function atualizarListaVisual() {
+            fileList.innerHTML = '';
+            arquivosSelecionados.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.textContent = file.name;
+                
+                const removeBtn = document.createElement('span');
+                removeBtn.textContent = ' ❌';
+                removeBtn.style.cursor = 'pointer';
+                removeBtn.onclick = () => {
+                    arquivosSelecionados.splice(index, 1);
+                    atualizarListaVisual();
+                    verificarEstadoBotao();
+                };
+                
+                li.appendChild(removeBtn);
+                fileList.appendChild(li);
+            });
+        }
+
+        // --- Lógica de Validação ---
+        
+        function verificarEstadoBotao() {
+            if (arquivosSelecionados.length > 0 && selectAmbiente.value !== "") {
+                btnAtualizar.disabled = false;
+            } else {
+                btnAtualizar.disabled = true;
+            }
+        }
+
+        selectAmbiente.addEventListener('change', verificarEstadoBotao);
+
+        // --- Lógica de Envio Real para a API Python ---
+        
+        btnAtualizar.addEventListener('click', async () => {
+            const ambienteEscolhido = selectAmbiente.value;
+            
+            // Cria um objeto FormData para empacotar os arquivos e o texto
+            const formData = new FormData();
+            formData.append('ambiente', ambienteEscolhido);
+            
+            arquivosSelecionados.forEach(file => {
+                formData.append('arquivos', file);
+            });
+
+            // Muda o texto do botão para indicar carregamento
+            const textoOriginal = btnAtualizar.textContent;
+            btnAtualizar.textContent = "Atualizando... Aguarde";
+            btnAtualizar.disabled = true;
+
+            try {
+                // Dispara os dados para a API Python
+                const response = await fetch('http://localhost:5000/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const resultado = await response.json();
+
+                if (response.ok) {
+                    // Monta uma mensagem com os detalhes do que aconteceu
+                    let mensagemFinal = resultado.mensagem + "\n\n";
+                    resultado.detalhes.forEach(det => mensagemFinal += det + "\n");
+                    
+                    alert(mensagemFinal);
+                    
+                    // Limpa a tela após o sucesso
+                    arquivosSelecionados = [];
+                    atualizarListaVisual();
+                    selectAmbiente.value = "";
+                    verificarEstadoBotao();
+                } else {
+                    alert("Erro no servidor: " + resultado.erro);
+                }
+
+            } catch (error) {
+                console.error("Erro na comunicação com a API:", error);
+                alert("Falha ao tentar conectar com o servidor. A API Python está rodando?");
+            } finally {
+                // Restaura o botão
+                btnAtualizar.textContent = textoOriginal;
+                verificarEstadoBotao();
+            }
+        });
+    </script>
+</body>
+</html>
