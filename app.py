@@ -37,19 +37,16 @@ def receber_arquivos():
     
     arquivos = request.files.getlist('arquivos')
     ambiente = request.form.get('ambiente')
-    tipo_arquivo = request.form.get('tipo_arquivo') # Recebe o novo campo da tela
+    tipo_arquivo = request.form.get('tipo_arquivo')
 
-    # Validações
     if not ambiente or ambiente not in ['homologacao', 'producao', 'ambos']:
         return jsonify({'erro': 'Ambiente inválido ou não informado.'}), 400
         
     if not tipo_arquivo or tipo_arquivo not in ['relatorio', 'masterpage']:
         return jsonify({'erro': 'Tipo de arquivo inválido ou não informado.'}), 400
 
-    # Define qual dicionário de caminhos usar com base na seleção
     caminhos_ativos = CAMINHOS_S3_RELATORIO if tipo_arquivo == 'relatorio' else CAMINHOS_S3_MASTERPAGE
 
-    # Define os destinos finais
     destinos = []
     if ambiente == 'ambos':
         destinos = [caminhos_ativos['homologacao'], caminhos_ativos['producao']]
@@ -64,6 +61,9 @@ def receber_arquivos():
                 caminho_completo_s3 = f"{destino}{arquivo.filename}"
                 
                 try:
+                    # REBOBINA O ARQUIVO NA MEMÓRIA ANTES DE CADA UPLOAD
+                    arquivo.seek(0)
+                    
                     s3_client.upload_fileobj(arquivo, NOME_DO_BUCKET, caminho_completo_s3)
                     resultados.append(f"✅ {arquivo.filename} -> {caminho_completo_s3}")
                 except Exception as e:
